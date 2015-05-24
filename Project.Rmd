@@ -1,0 +1,79 @@
+---
+title: "Personal Activity Project"
+author: "DS"
+date: "May, 2015"
+output: html_document
+---
+
+##Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, [the] goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. (from Coursera)
+
+##Modeling
+
+First, I loaded the data and opened Caret library:
+
+```{r, cache=TRUE}
+setwd("~/OneDrive/Coursera/Data Science Spec/Practical Machine Learning/Project")
+library(caret); train <- read.csv("pml-training.csv"); test <- read.csv("pml-testing.csv")
+```
+
+Then, I looked for those variables with "Near Zero Variance" and removed them from the model (they don´t give much information).
+
+```{r}
+nsv <- nearZeroVar(train)
+trainSum <- train[,-nsv]; testSum <- test[,-nsv]
+```
+
+Also, I noticed some variables had mosty NA observations. I decided to list them and also remove them from the model.
+
+```{r}
+mostNA <- c('max_roll_belt', 'max_picth_belt', 'min_roll_belt', 'min_pitch_belt', 'amplitude_roll_belt', 
+            'amplitude_pitch_belt', 'var_total_accel_belt', 'avg_roll_belt', 'stddev_roll_belt', 
+            'var_roll_belt', 'avg_pitch_belt', 'stddev_pitch_belt', 'var_pitch_belt', 'avg_yaw_belt', 
+            'stddev_yaw_belt', 'var_yaw_belt', 'var_accel_arm', 'max_picth_arm', 'max_yaw_arm', 
+            'min_yaw_arm', 'amplitude_yaw_arm', 'max_roll_dumbbell', 'max_picth_dumbbell', 
+            'min_roll_dumbbell', 'min_pitch_dumbbell', 'amplitude_roll_dumbbell', 'amplitude_pitch_dumbbell',
+            'var_accel_dumbbell', 'avg_roll_dumbbell', 'stddev_roll_dumbbell', 'var_roll_dumbbell', 
+            'avg_pitch_dumbbell', 'stddev_pitch_dumbbell', 'var_pitch_dumbbell', 'avg_yaw_dumbbell', 
+            'stddev_yaw_dumbbell', 'var_yaw_dumbbell', 'max_picth_forearm', 'min_pitch_forearm', 
+            'amplitude_pitch_forearm', 'var_accel_forearm')
+trainSum <- trainSum[,!(names(trainSum)%in%mostNA)]; testSum <- testSum[,!(names(testSum)%in%mostNA)]
+```
+
+Looking at the first variables, I realized they gave information about the subject doing the exercise and not about the exercise itself, I removed them.
+
+```{r, cache=TRUE}
+trainSum <- trainSum[,-c(1:5)]; testSum <- testSum[,-c(1:5)]
+```
+
+Then, I fitted a Gradient Boosting Machine model using the adjusted train data and predicted the "classe" values for the test set. After submitting my predictions I got full credits (all 20 answers were correct). The model was created using 10 CV folds and Caret atomatically selected the most accurate model (almost 99% accuracy).
+
+```{r, cache=TRUE}
+modFit <- train(classe ~ ., method = "gbm", data = trainSum)
+modFit$results
+```
+```{r}
+pred <- predict(modFit, testSum)
+pred
+```
+
+You can see the accuracy of the model I chose on the folowing plot (I turned factor variables to numbers so  I could add some noise using jitter):
+
+```{r, cache=TRUE}
+library(ggplot2)
+qplot(jitter(as.numeric(predict(modFit,trainSum))), jitter(as.numeric(trainSum$classe)))
+```
+
+Finally, I created the files I needed in order to submit the predictions.
+
+```{r}
+pml_write_files = function(x){
+        n = length(x)
+        for(i in 1:n){
+                filename = paste0("problem_id_",i,".txt")
+                write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+        }
+}
+pml_write_files(pred)
+```
